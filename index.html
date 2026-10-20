@@ -1,6 +1,6 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Buddy Brain Test</title></head>
 <body>
-<h1>Buddy Self-Test v5 - full flow, 135M q8, 8 turns</h1>
+<h1>Buddy Self-Test v6 - 135M q8, temp 0.3, strict prompt</h1>
 <div id="log" style="font-family:monospace;white-space:pre-wrap"></div>
 <script>
 const logEl = document.getElementById('log');
@@ -11,11 +11,10 @@ log('page loaded, importing library...');
 <script type="module">
 const logEl = document.getElementById('log');
 function log(m){ logEl.textContent += m + "\n"; }
-// --- replicate the app's logic ---
 let notebook = ["My human's name is Aldo.", "Aldo lives in Miami.", "Aldo builds robot games."];
-let history = []; // {role, content}
+let history = [];
 function systemMsg(){
-  return "You are Buddy, a friendly little robot who lives in a phone. You are cheerful and loyal. Keep every answer short: one or two sentences. Do not ask questions back unless it fits naturally." + (notebook.length ? " Facts you know: " + notebook.join(' ') : "");
+  return "You are Buddy, a friendly little robot. Answer the user's question directly in one short sentence. Use these facts when relevant: " + notebook.join(' ') + " Never ask a question back.";
 }
 function cleanReply(t){
   t = t.trim();
@@ -24,7 +23,7 @@ function cleanReply(t){
   lines = lines.filter(l => !(l.endsWith('?') && /^(what|who|where|when|why|how|do you|can you|would you|is|are)/i.test(l)));
   t = lines.join(' ');
   const sents = t.split(/(?<=[.!?])\s+/);
-  return sents.slice(0,3).join(' ').trim();
+  return sents.slice(0,2).join(' ').trim();
 }
 try {
   const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
@@ -33,21 +32,16 @@ try {
   const gen = await pipeline('text-generation', 'onnx-community/SmolLM2-135M-Instruct-ONNX', { dtype: 'q8',
     progress_callback: p => { if(p.status==='done') log('dl done: ' + p.file); }});
   log('PIPELINE READY');
-  const nameMatch = notebook.join(' ').match(/name is ([A-Za-z]+)/i);
-  const nm = nameMatch ? nameMatch[1] : 'friend';
-  const greeting = "Beep boop — hi, " + nm + "! I'm Buddy. My brain lives right here in this page now. Ask me anything!";
-  log('GREETING: ' + greeting);
   async function chat(userText){
     if (/^remember\b/i.test(userText)) {
       const fact = userText.replace(/^remember:?\s*/i,'').trim();
       if (fact) { notebook.push(fact.endsWith('.') ? fact : fact + '.'); }
-      const confirm = "Got it — written in my notebook: " + fact;
-      log('USER: ' + userText); log('BUDDY: ' + confirm + ' (taught, no generation)');
+      log('USER: ' + userText); log('BUDDY: Got it — written in my notebook: ' + fact + ' (taught, no generation)');
       return;
     }
     const t0 = performance.now();
     const msgs = [{role:'system',content:systemMsg()}, ...history.slice(-4), {role:'user',content:userText}];
-    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.7, do_sample: true });
+    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.3, do_sample: true });
     const gt = out[0].generated_text;
     const raw = Array.isArray(gt) ? gt[gt.length-1].content : String(gt);
     const reply = cleanReply(raw);
