@@ -1,31 +1,30 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Buddy Brain Test</title></head>
 <body>
-<h1>Buddy Brain Test</h1>
+<h1>Buddy Brain Test v2 (ES module build)</h1>
 <div id="log" style="font-family:monospace;white-space:pre-wrap"></div>
 <script>
 const logEl = document.getElementById('log');
 function log(m){ logEl.textContent += m + "\n"; }
 window.addEventListener('error', e => log('WINDOW ERROR: ' + e.message));
-log('page loaded, loading library...');
+log('page loaded, importing library as ES module...');
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
-<script>
-(async () => {
-  try {
-    log('library script tag done. window.Transformers = ' + typeof window.Transformers);
-    const { pipeline, env } = window.Transformers;
-    env.allowLocalModels = false;
-    log('starting pipeline download: Xenova/distilgpt2 ...');
-    const gen = await pipeline('text-generation', 'Xenova/distilgpt2', { quantized: true,
-      progress_callback: p => { if(p.status==='progress') log('dl ' + p.file + ' ' + Math.round(p.progress) + '%'); }});
-    log('PIPELINE READY');
-    const out = await gen('The capital of France is', { max_new_tokens: 8, temperature: 0.1 });
-    log('GENERATED: ' + JSON.stringify(out[0].generated_text));
-    document.title = 'BUDDY TEST PASS';
-  } catch(e) {
-    log('FAILED: ' + (e && e.message ? e.message : e));
-    document.title = 'BUDDY TEST FAIL';
-  }
-})();
+<script type="module">
+const logEl = document.getElementById('log');
+function log(m){ logEl.textContent += m + "\n"; }
+try {
+  const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
+  log('library imported OK. env.backends = ' + JSON.stringify(Object.keys(env.backends || {})));
+  env.allowLocalModels = false;
+  log('starting pipeline download: Xenova/distilgpt2 (q8) ...');
+  const gen = await pipeline('text-generation', 'Xenova/distilgpt2', { dtype: 'q8',
+    progress_callback: p => { if(p.status==='progress') log('dl ' + p.file + ' ' + Math.round(p.progress) + '%'); }});
+  log('PIPELINE READY');
+  const out = await gen('The capital of France is', { max_new_tokens: 8, temperature: 0.1, do_sample: false });
+  log('GENERATED: ' + JSON.stringify(out[0].generated_text));
+  document.title = 'BUDDY TEST PASS';
+} catch(e) {
+  log('FAILED: ' + (e && e.message ? e.message : e) + (e && e.stack ? ' | ' + e.stack.split('\n')[1] : ''));
+  document.title = 'BUDDY TEST FAIL';
+}
 </script>
 </body></html>
