@@ -1,6 +1,6 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Buddy Brain Test</title></head>
 <body>
-<h1>Buddy Self-Test v6 - 135M q8, temp 0.3, strict prompt</h1>
+<h1>Buddy Self-Test v7 - 360M q8 stability, 8 turns, memory diet</h1>
 <div id="log" style="font-family:monospace;white-space:pre-wrap"></div>
 <script>
 const logEl = document.getElementById('log');
@@ -14,7 +14,7 @@ function log(m){ logEl.textContent += m + "\n"; }
 let notebook = ["My human's name is Aldo.", "Aldo lives in Miami.", "Aldo builds robot games."];
 let history = [];
 function systemMsg(){
-  return "You are Buddy, a friendly little robot. Answer the user's question directly in one short sentence. Use these facts when relevant: " + notebook.join(' ') + " Never ask a question back.";
+  return "You are Buddy, a friendly little robot who lives in a phone. You are cheerful and loyal. Keep every answer short: one or two sentences. Do not ask questions back unless it fits naturally." + (notebook.length ? " Facts you know: " + notebook.join(' ') : "");
 }
 function cleanReply(t){
   t = t.trim();
@@ -23,15 +23,16 @@ function cleanReply(t){
   lines = lines.filter(l => !(l.endsWith('?') && /^(what|who|where|when|why|how|do you|can you|would you|is|are)/i.test(l)));
   t = lines.join(' ');
   const sents = t.split(/(?<=[.!?])\s+/);
-  return sents.slice(0,2).join(' ').trim();
+  return sents.slice(0,3).join(' ').trim();
 }
 try {
   const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
   log('library imported OK');
   env.allowLocalModels = false;
-  const gen = await pipeline('text-generation', 'onnx-community/SmolLM2-135M-Instruct-ONNX', { dtype: 'q8',
+  const t0dl = performance.now();
+  const gen = await pipeline('text-generation', 'onnx-community/SmolLM2-360M-Instruct-ONNX', { dtype: 'q8',
     progress_callback: p => { if(p.status==='done') log('dl done: ' + p.file); }});
-  log('PIPELINE READY');
+  log('PIPELINE READY in ' + Math.round((performance.now()-t0dl)/1000) + 's');
   async function chat(userText){
     if (/^remember\b/i.test(userText)) {
       const fact = userText.replace(/^remember:?\s*/i,'').trim();
@@ -41,7 +42,7 @@ try {
     }
     const t0 = performance.now();
     const msgs = [{role:'system',content:systemMsg()}, ...history.slice(-4), {role:'user',content:userText}];
-    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.3, do_sample: true });
+    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.7, do_sample: true });
     const gt = out[0].generated_text;
     const raw = Array.isArray(gt) ? gt[gt.length-1].content : String(gt);
     const reply = cleanReply(raw);
@@ -60,7 +61,7 @@ try {
   await chat('What did you just tell me about my shop?');
   await chat('Why is the sky blue?');
   log('notebook now: ' + JSON.stringify(notebook));
-  log('ALL DONE — 8 turns survived');
+  log('ALL DONE — 8 turns survived, 360M stable');
   document.title = 'BUDDY TEST PASS';
 } catch(e) {
   log('FAILED: ' + (e && e.message ? e.message : e));
