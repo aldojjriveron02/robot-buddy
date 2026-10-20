@@ -1,29 +1,43 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>Buddy Brain Test</title></head>
 <body>
-<h1>Buddy Brain Test v2 (ES module build)</h1>
+<h1>Buddy Brain Test v3 - SmolLM2-360M-Instruct</h1>
 <div id="log" style="font-family:monospace;white-space:pre-wrap"></div>
 <script>
 const logEl = document.getElementById('log');
 function log(m){ logEl.textContent += m + "\n"; }
 window.addEventListener('error', e => log('WINDOW ERROR: ' + e.message));
-log('page loaded, importing library as ES module...');
+log('page loaded, importing library...');
 </script>
 <script type="module">
 const logEl = document.getElementById('log');
 function log(m){ logEl.textContent += m + "\n"; }
 try {
   const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
-  log('library imported OK. env.backends = ' + JSON.stringify(Object.keys(env.backends || {})));
+  log('library imported OK');
   env.allowLocalModels = false;
-  log('starting pipeline download: Xenova/distilgpt2 (q8) ...');
-  const gen = await pipeline('text-generation', 'Xenova/distilgpt2', { dtype: 'q8',
-    progress_callback: p => { if(p.status==='progress') log('dl ' + p.file + ' ' + Math.round(p.progress) + '%'); }});
+  const MODEL = 'onnx-community/SmolLM2-360M-Instruct-ONNX';
+  log('downloading brain: ' + MODEL + ' (q4) ...');
+  let lastPct = -10;
+  const gen = await pipeline('text-generation', MODEL, { dtype: 'q4',
+    progress_callback: p => { if(p.status==='progress' && p.file && p.file.includes('model')) { const pc = Math.round(p.progress); if(pc >= lastPct + 25) { lastPct = pc; log('dl model ' + pc + '%'); } } }});
   log('PIPELINE READY');
-  const out = await gen('The capital of France is', { max_new_tokens: 8, temperature: 0.1, do_sample: false });
-  log('GENERATED: ' + JSON.stringify(out[0].generated_text));
+  const sys = { role: 'system', content: 'You are Buddy, a friendly little robot who lives in a phone. Keep answers short, two sentences max. Facts you know: your human is named Aldo; Aldo lives in Miami; Aldo builds robot games.' };
+  async function ask(q) {
+    const msgs = [sys, { role: 'user', content: q }];
+    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.7, do_sample: true });
+    const gt = out[0].generated_text;
+    const reply = Array.isArray(gt) ? gt[gt.length - 1].content : String(gt);
+    log('Q: ' + q);
+    log('A: ' + reply.trim());
+    return reply;
+  }
+  await ask('Tell me a short joke.');
+  await ask('What is the capital of France?');
+  await ask('Who is your human and where does he live?');
   document.title = 'BUDDY TEST PASS';
+  log('ALL DONE');
 } catch(e) {
-  log('FAILED: ' + (e && e.message ? e.message : e) + (e && e.stack ? ' | ' + e.stack.split('\n')[1] : ''));
+  log('FAILED: ' + (e && e.message ? e.message : e));
   document.title = 'BUDDY TEST FAIL';
 }
 </script>
