@@ -294,9 +294,13 @@ async function send(text) {
   heartbeat(true); genCount++;
   try {
     const msgs = [{ role: 'system', content: systemMsg() }, ...history.slice(-4), { role: 'user', content: text }];
-    const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.7, do_sample: true });
-    const gt = out[0].generated_text;
-    const reply = cleanReply(Array.isArray(gt) ? gt[gt.length - 1].content : String(gt)) || "Hmm, my brain hiccuped — ask me again!";
+    let reply = "";
+    for (let attempt = 0; attempt < 2 && !reply; attempt++) {
+      const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.4, do_sample: true });
+      const gt = out[0].generated_text;
+      reply = cleanReply(Array.isArray(gt) ? gt[gt.length - 1].content : String(gt));
+    }
+    if (!reply) reply = "Hmm, my brain hiccuped — ask me again!";
     history.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
     ty.remove(); addMsg('buddy', reply); speak(reply);
   } catch (e) {
