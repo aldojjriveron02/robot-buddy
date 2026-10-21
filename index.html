@@ -1,71 +1,313 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buddy Brain Test</title></head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Robot Buddy">
+<title>Robot Buddy</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: #0b1220; color: #e8eef7; font-family: -apple-system, system-ui, sans-serif;
+         padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 12px 14px 24px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 8px 0 14px; }
+  .bot { width: 56px; height: 56px; border-radius: 14px; background: #16233a; position: relative; flex: none;
+         border: 1px solid #24344f; }
+  .bot .ant { position: absolute; top: -9px; left: 50%; width: 3px; height: 10px; background: #3ecfbf; transform: translateX(-50%); }
+  .bot .ant::after { content: ""; position: absolute; top: -5px; left: -2.5px; width: 8px; height: 8px; border-radius: 50%; background: #ff8c42; }
+  .bot .face { position: absolute; inset: 12px 8px 8px; background: #0e1626; border-radius: 8px; }
+  .bot .eye { position: absolute; top: 10px; width: 7px; height: 9px; border-radius: 4px; background: #3ecfbf; }
+  .bot .eye.l { left: 12px; } .bot .eye.r { right: 12px; }
+  .bot .smile { position: absolute; bottom: 7px; left: 50%; width: 20px; height: 10px; transform: translateX(-50%);
+                border: 2.5px solid #3ecfbf; border-top: none; border-radius: 0 0 20px 20px; }
+  h1 { font-size: 22px; margin: 0; }
+  .sub { font-size: 13px; color: #93a3bb; margin-top: 2px; }
+  .pill { margin-left: auto; font-size: 12px; padding: 6px 10px; border-radius: 20px; border: 1px solid #24344f; color: #93a3bb; white-space: nowrap; }
+  .pill.live { color: #3ecfbf; border-color: #3ecfbf; }
+  #voiceBtn { margin-left: 8px; font-size: 12px; padding: 6px 10px; border-radius: 20px; border: 1px solid #3ecfbf;
+              background: transparent; color: #3ecfbf; white-space: nowrap; }
+  #voiceBtn.off { color: #93a3bb; border-color: #24344f; }
+  .card { background: #111c30; border: 1px solid #24344f; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 8px; font-size: 17px; }
+  .card p { font-size: 14px; color: #b9c6da; line-height: 1.5; margin: 0 0 10px; }
+  #wakeBtn { display: block; width: 100%; padding: 15px; font-size: 17px; font-weight: 700; color: #fff;
+             background: linear-gradient(180deg, #ff9a56, #f97316); border: none; border-radius: 14px; }
+  #wakeBtn:disabled { opacity: .55; }
+  #phase { font-size: 13px; color: #93a3bb; margin-top: 10px; min-height: 18px; }
+  #bar { height: 8px; background: #0b1424; border-radius: 6px; margin-top: 8px; overflow: hidden; display: none; }
+  #barFill { height: 100%; width: 0%; background: #3ecfbf; border-radius: 6px; }
+  #errBox { display: none; background: #3a1414; border: 1px solid #e5484d; border-radius: 12px; padding: 12px; margin-top: 10px; font-size: 13px; }
+  #errBox b { color: #ff8585; }
+  #errBox code { display: block; margin-top: 6px; font-size: 11px; color: #ffb3b3; word-break: break-word; white-space: pre-wrap; }
+  #chat { display: none; }
+  .msg { max-width: 88%; padding: 10px 13px; border-radius: 15px; margin: 8px 0; font-size: 15px; line-height: 1.45; position: relative; }
+  .msg.buddy { background: #1a2942; border-bottom-left-radius: 4px; }
+  .msg.me { background: #f97316; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
+  .msg .spk { position: absolute; right: -38px; top: 6px; font-size: 18px; background: #1a2942; border: 1px solid #24344f;
+              border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .chip { font-size: 13px; padding: 8px 12px; border-radius: 20px; border: 1px solid #3ecfbf; background: transparent; color: #3ecfbf; }
+  .composer { display: flex; gap: 8px; margin-top: 6px; }
+  #in { flex: 1; padding: 13px 14px; border-radius: 22px; border: 1px solid #24344f; background: #0e1728; color: #fff; font-size: 15px; }
+  #send { width: 48px; height: 48px; border-radius: 50%; border: none; background: #f97316; color: #fff; font-size: 20px; flex: none; }
+  #send:disabled { opacity: .4; }
+  #nbPanel { margin-top: 12px; }
+  #nbHead { display: flex; align-items: center; font-size: 15px; font-weight: 700; padding: 10px 2px; }
+  #nbHead .cnt { font-size: 12px; color: #93a3bb; font-weight: 400; margin-left: 8px; }
+  #nbHead .tog { margin-left: auto; color: #93a3bb; }
+  #nbBody { display: none; }
+  #nbBody.open { display: block; }
+  .fact { display: flex; align-items: center; gap: 8px; font-size: 14px; background: #0e1728; border: 1px solid #24344f;
+          border-radius: 10px; padding: 9px 11px; margin-bottom: 6px; }
+  .fact span { flex: 1; }
+  .fact button { background: none; border: none; color: #93a3bb; font-size: 16px; }
+  .teach { display: flex; gap: 8px; margin-top: 8px; }
+  #teachIn { flex: 1; padding: 11px 12px; border-radius: 12px; border: 1px solid #24344f; background: #0e1728; color: #fff; font-size: 14px; }
+  #teachBtn { padding: 11px 14px; border-radius: 12px; border: none; background: #3ecfbf; color: #06251f; font-weight: 700; }
+  #forgetAll { display: block; margin: 8px auto 0; background: none; border: none; color: #5d6f89; font-size: 12px; }
+  .fine { font-size: 12px; color: #5d6f89; text-align: center; margin-top: 14px; line-height: 1.5; }
+  .typing { color: #93a3bb; font-size: 13px; margin: 6px 0; }
+</style>
+</head>
 <body>
-<h1>Buddy Self-Test v7 - 360M q8 stability, 8 turns, memory diet</h1>
-<div id="log" style="font-family:monospace;white-space:pre-wrap"></div>
+<div class="wrap">
+  <header>
+    <div class="bot"><div class="ant"></div><div class="face"><div class="eye l"></div><div class="eye r"></div><div class="smile"></div></div></div>
+    <div><h1>Robot Buddy</h1><div class="sub">A real AI brain, living right inside this page.</div></div>
+    <div class="pill" id="statusPill">Asleep</div>
+    <button id="voiceBtn" style="display:none">🔊 Voice: On</button>
+  </header>
+
+  <div class="card" id="brainCard">
+    <div id="crashNote" style="display:none;background:#3a2c10;border:1px solid #e5a54d;border-radius:12px;padding:12px;margin-bottom:10px;font-size:13px;color:#ffd9a0"></div>
+    <h2 id="brainTitle">Buddy's brain isn't loaded yet</h2>
+    <p>Tap the button and this page downloads Buddy's AI brain — one that was actually trained to answer questions — then runs it <b>on your phone, inside this page</b>. No App Store, no account, no cost. About 363&nbsp;MB, one-time download — Wi-Fi is best. After that first download, Buddy thinks right here, even with the internet off.</p>
+    <button id="wakeBtn">Wake up Buddy</button>
+    <div id="phase"></div>
+    <div id="bar"><div id="barFill"></div></div>
+    <div id="errBox"></div>
+  </div>
+
+  <div id="chat">
+    <div id="msgs"></div>
+    <div class="chips" id="chips" style="display:none">
+      <button class="chip" data-q="Tell me a short joke.">🎭 Tell me a joke</button>
+      <button class="chip" data-q="Why is the sky blue?">🌤️ Why is the sky blue?</button>
+      <button class="chip" data-q="Tell me a robot poem.">🤖 Robot poem</button>
+      <button class="chip" data-q="What is the capital of France?">🗼 Capital of France?</button>
+    </div>
+    <div class="composer">
+      <input id="in" placeholder="Talk to Buddy..." autocomplete="off">
+      <button id="send" disabled>↑</button>
+    </div>
+    <div id="nbPanel">
+      <div id="nbHead">📓 Buddy's Notebook <span class="cnt" id="nbCount"></span><span class="tog" id="nbTog">▶</span></div>
+      <div id="nbBody">
+        <div id="facts"></div>
+        <div class="teach"><input id="teachIn" placeholder="Teach Buddy something..."><button id="teachBtn">Save</button></div>
+        <button id="forgetAll">Forget everything</button>
+        <div class="fine" style="text-align:left">Buddy's brain can't learn by itself — this notebook is how he remembers. It lives only on this phone.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fine">Buddy thinks on your phone — nothing you type leaves this page, and his notebook stays on this phone.</div>
+</div>
+
 <script>
-const logEl = document.getElementById('log');
-function log(m){ logEl.textContent += m + "\n"; }
-window.addEventListener('error', e => log('WINDOW ERROR: ' + e.message));
-log('page loaded, importing library...');
-</script>
-<script type="module">
-const logEl = document.getElementById('log');
-function log(m){ logEl.textContent += m + "\n"; }
-let notebook = ["My human's name is Aldo.", "Aldo lives in Miami.", "Aldo builds robot games."];
-let history = [];
-function systemMsg(){
+const $ = id => document.getElementById(id);
+const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js';
+const BIG = { id: 'onnx-community/SmolLM2-360M-Instruct-ONNX', dtype: 'q8', label: 'big brain', size: '~363 MB' };
+const SMALL = { id: 'onnx-community/SmolLM2-135M-Instruct-ONNX', dtype: 'q8', label: 'smaller brain', size: '~136 MB' };
+let gen = null, live = false, history = [], voiceOn = true, genCount = 0;
+
+function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e) {} return null; }
+function setPhase(t) { $('phase').textContent = t; }
+function setPill(t, on) { const p = $('statusPill'); p.textContent = t; p.classList.toggle('live', !!on); }
+function showError(phase, err) {
+  const box = $('errBox');
+  box.style.display = 'block';
+  box.innerHTML = '<b>Something broke ' + phase + '.</b><code>' + String((err && err.name ? err.name + ': ' : '') + (err && err.message ? err.message : err)).slice(0, 600) + '</code><div style="margin-top:8px;color:#ffb3b3">If you show this box to El Loko, he can see exactly what failed.</div>';
+  try { ls('buddy_last_error', phase + ' :: ' + String(err && err.message || err).slice(0, 300)); } catch(e) {}
+}
+function heartbeat(on) {
+  clearInterval(window._hb);
+  if (on) { window._hb = setInterval(() => { try { ls('buddy_hb', String(Date.now())); } catch(e) {} }, 2000); }
+  else { try { localStorage.removeItem('buddy_hb'); } catch(e) {} }
+}
+window.addEventListener('pagehide', () => { try { if (live) ls('buddy_clean', '1'); } catch(e) {} });
+
+// crash detector
+(function () {
+  try {
+    const hb = localStorage.getItem('buddy_hb'), clean = localStorage.getItem('buddy_clean'), err = localStorage.getItem('buddy_last_error');
+    if (hb && !clean && !err && Date.now() - Number(hb) < 120000) {
+      const n = $('crashNote');
+      n.style.display = 'block';
+      n.textContent = "Buddy's page shut down suddenly while he was thinking. He's back on his smaller brain now to stay safe.";
+      ls('buddy_brain_choice', 'small');
+    }
+    localStorage.removeItem('buddy_hb'); localStorage.removeItem('buddy_clean');
+  } catch(e) {}
+})();
+
+// notebook
+const SEEDS = ["My human's name is Aldo.", "Aldo lives in Miami.", "Aldo builds robot games."];
+let notebook;
+try { notebook = JSON.parse(localStorage.getItem('buddy_notebook_v1') || 'null') || SEEDS.slice(); }
+catch(e) { notebook = SEEDS.slice(); }
+function saveNb() { try { localStorage.setItem('buddy_notebook_v1', JSON.stringify(notebook)); } catch(e) {} }
+function renderNb() {
+  $('nbCount').textContent = notebook.length + ' facts';
+  $('facts').innerHTML = '';
+  notebook.forEach((f, i) => {
+    const d = document.createElement('div'); d.className = 'fact';
+    const s = document.createElement('span'); s.textContent = f;
+    const b = document.createElement('button'); b.textContent = '✕';
+    b.onclick = () => { notebook.splice(i, 1); saveNb(); renderNb(); };
+    d.appendChild(s); d.appendChild(b); $('facts').appendChild(d);
+  });
+}
+$('nbHead').onclick = () => { $('nbBody').classList.toggle('open'); $('nbTog').textContent = $('nbBody').classList.contains('open') ? '▼' : '▶'; };
+$('teachBtn').onclick = () => { const v = $('teachIn').value.trim(); if (!v) return; teach(v); $('teachIn').value = ''; };
+$('forgetAll').onclick = () => { notebook = []; saveNb(); renderNb(); };
+function teach(text) {
+  const fact = text.replace(/^remember:?\s*/i, '').trim();
+  if (!fact) return null;
+  const f = fact.endsWith('.') ? fact : fact + '.';
+  notebook.push(f); saveNb(); renderNb();
+  return f;
+}
+function humanName() { const m = notebook.join(' ').match(/name is ([A-Za-z]+)/i); return m ? m[1] : 'friend'; }
+
+// voice
+try { voiceOn = localStorage.getItem('buddy_voice') !== 'off'; } catch(e) {}
+function renderVoice() { const b = $('voiceBtn'); b.style.display = ''; b.textContent = voiceOn ? '🔊 Voice: On' : '🔇 Voice: Off'; b.classList.toggle('off', !voiceOn); }
+$('voiceBtn').onclick = () => { voiceOn = !voiceOn; try { localStorage.setItem('buddy_voice', voiceOn ? 'on' : 'off'); } catch(e) {} if (!voiceOn && window.speechSynthesis) speechSynthesis.cancel(); renderVoice(); };
+function speak(text) {
+  if (!voiceOn || !window.speechSynthesis) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.pitch = 0.8; u.rate = 1.0;
+    speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
+// brain
+function systemMsg() {
   return "You are Buddy, a friendly little robot who lives in a phone. You are cheerful and loyal. Keep every answer short: one or two sentences. Do not ask questions back unless it fits naturally." + (notebook.length ? " Facts you know: " + notebook.join(' ') : "");
 }
-function cleanReply(t){
-  t = t.trim();
+function cleanReply(t) {
+  t = String(t || '').trim();
   const blank = t.indexOf('\n\n'); if (blank > 0) t = t.slice(0, blank);
-  let lines = t.split('\n').map(s=>s.trim()).filter(Boolean);
+  let lines = t.split('\n').map(s => s.trim()).filter(Boolean);
   lines = lines.filter(l => !(l.endsWith('?') && /^(what|who|where|when|why|how|do you|can you|would you|is|are)/i.test(l)));
   t = lines.join(' ');
-  const sents = t.split(/(?<=[.!?])\s+/);
-  return sents.slice(0,3).join(' ').trim();
+  return t.split(/(?<=[.!?])\s+/).slice(0, 3).join(' ').trim();
 }
-try {
-  const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js');
-  log('library imported OK');
+function addMsg(who, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + (who === 'me' ? 'me' : 'buddy');
+  d.textContent = text;
+  if (who === 'buddy') {
+    const s = document.createElement('button'); s.className = 'spk'; s.textContent = '🔊';
+    s.onclick = () => speak(text);
+    d.appendChild(s);
+  }
+  $('msgs').appendChild(d);
+  d.scrollIntoView({ block: 'nearest' });
+}
+async function loadBrain(which) {
+  const { pipeline, env } = await import(LIB);
   env.allowLocalModels = false;
-  const t0dl = performance.now();
-  const gen = await pipeline('text-generation', 'onnx-community/SmolLM2-360M-Instruct-ONNX', { dtype: 'q8',
-    progress_callback: p => { if(p.status==='done') log('dl done: ' + p.file); }});
-  log('PIPELINE READY in ' + Math.round((performance.now()-t0dl)/1000) + 's');
-  async function chat(userText){
-    if (/^remember\b/i.test(userText)) {
-      const fact = userText.replace(/^remember:?\s*/i,'').trim();
-      if (fact) { notebook.push(fact.endsWith('.') ? fact : fact + '.'); }
-      log('USER: ' + userText); log('BUDDY: Got it — written in my notebook: ' + fact + ' (taught, no generation)');
-      return;
+  $('bar').style.display = 'block';
+  const g = await pipeline('text-generation', which.id, { dtype: which.dtype,
+    progress_callback: p => {
+      if (p.status === 'progress' && p.file && p.total) {
+        $('barFill').style.width = Math.round(p.loaded / p.total * 100) + '%';
+        setPhase('Downloading ' + which.label + ' (' + which.size + ')... ' + Math.round(p.loaded / p.total * 100) + '%');
+      }
+    }});
+  setPhase('Starting up ' + which.label + '...');
+  const t = await g([{ role: 'user', content: 'Say "ready".' }], { max_new_tokens: 5 });
+  const gt = t[0].generated_text;
+  const txt = cleanReply(Array.isArray(gt) ? gt[gt.length - 1].content : String(gt));
+  if (!txt) throw new Error('EmptyTestReply');
+  return g;
+}
+$('wakeBtn').onclick = async () => {
+  $('wakeBtn').disabled = true; $('errBox').style.display = 'none';
+  try { localStorage.removeItem('buddy_last_error'); } catch(e) {}
+  setPill('Waking'); heartbeat(true);
+  const order = (ls('buddy_brain_choice') === 'small') ? [SMALL, BIG] : [BIG, SMALL];
+  for (const which of order) {
+    try {
+      setPhase('Loading ' + which.label + ' (' + which.size + ')...');
+      gen = await loadBrain(which);
+      heartbeat(false);
+      try { ls('buddy_brain_choice', which === BIG ? 'big' : 'small'); } catch(e) {}
+      if (which === SMALL && order[0] === BIG) addSysNote("The bigger brain couldn't fit on this phone, so Buddy switched to his smaller brain — still trained to answer, just humbler.");
+      return ready();
+    } catch (e) {
+      showError('while loading the ' + which.label, e);
+      setPhase('The ' + which.label + ' failed — trying the other brain...');
     }
-    const t0 = performance.now();
-    const msgs = [{role:'system',content:systemMsg()}, ...history.slice(-4), {role:'user',content:userText}];
+  }
+  heartbeat(false);
+  setPill('Asleep'); $('wakeBtn').disabled = false; $('wakeBtn').textContent = 'Try again';
+  setPhase('Both brains failed. The red box above has the real reasons.');
+};
+function addSysNote(t) {
+  const d = document.createElement('div');
+  d.style.cssText = 'font-size:13px;color:#93a3bb;text-align:center;margin:8px 0;';
+  d.textContent = t; $('msgs').appendChild(d);
+}
+function ready() {
+  live = true;
+  setPill('Brain live', true); setPhase('');
+  $('brainCard').style.display = 'none';
+  $('chat').style.display = 'block';
+  renderVoice(); renderNb();
+  const g = "Beep boop — hi, " + humanName() + "! I'm Buddy. My brain lives right here in this page now. Ask me anything!";
+  addMsg('buddy', g); speak(g);
+  $('chips').style.display = 'flex';
+  $('send').disabled = false;
+  $('in').focus();
+}
+async function send(text) {
+  text = (text || '').trim();
+  if (!text || !live || !gen) return;
+  addMsg('me', text);
+  $('in').value = '';
+  if (/^remember\b/i.test(text)) {
+    const f = teach(text);
+    const c = f ? "Got it — written in my notebook: " + f : "Tell me what to remember!";
+    addMsg('buddy', c); speak(c);
+    return;
+  }
+  const ty = document.createElement('div'); ty.className = 'typing'; ty.textContent = 'Buddy is thinking...';
+  $('msgs').appendChild(ty);
+  heartbeat(true); genCount++;
+  try {
+    const msgs = [{ role: 'system', content: systemMsg() }, ...history.slice(-4), { role: 'user', content: text }];
     const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.7, do_sample: true });
     const gt = out[0].generated_text;
-    const raw = Array.isArray(gt) ? gt[gt.length-1].content : String(gt);
-    const reply = cleanReply(raw);
-    const dt = Math.round(performance.now() - t0);
-    history.push({role:'user',content:userText},{role:'assistant',content:reply});
-    log('USER: ' + userText);
-    log('BUDDY (' + dt + 'ms): ' + (reply || '[EMPTY]'));
-    if (!reply) throw new Error('EmptyTestReply at turn: ' + userText);
+    const reply = cleanReply(Array.isArray(gt) ? gt[gt.length - 1].content : String(gt)) || "Hmm, my brain hiccuped — ask me again!";
+    history.push({ role: 'user', content: text }, { role: 'assistant', content: reply });
+    ty.remove(); addMsg('buddy', reply); speak(reply);
+  } catch (e) {
+    ty.remove(); addMsg('buddy', "Ouch — something broke while I was thinking. Try again?");
+  } finally {
+    if (genCount >= 3) heartbeat(false);
   }
-  await chat('Tell me a short joke.');
-  await chat('What is the capital of France?');
-  await chat('remember my shop is called Miami Fixes');
-  await chat('Who is your human and where does he live?');
-  await chat('What is my shop called?');
-  await chat('Tell me a robot poem.');
-  await chat('What did you just tell me about my shop?');
-  await chat('Why is the sky blue?');
-  log('notebook now: ' + JSON.stringify(notebook));
-  log('ALL DONE — 8 turns survived, 360M stable');
-  document.title = 'BUDDY TEST PASS';
-} catch(e) {
-  log('FAILED: ' + (e && e.message ? e.message : e));
-  document.title = 'BUDDY TEST FAIL';
 }
+$('send').onclick = () => send($('in').value);
+$('in').addEventListener('keydown', e => { if (e.key === 'Enter') send($('in').value); });
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => send(c.dataset.q));
 </script>
-</body></html>
+</body>
+</html>
