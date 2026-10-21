@@ -198,8 +198,14 @@ function speak(text) {
 }
 
 // brain
+const EXAMPLES = [
+  { role: 'user', content: 'What is the capital of France?' },
+  { role: 'assistant', content: 'Paris!' },
+  { role: 'user', content: 'Tell me a short joke.' },
+  { role: 'assistant', content: 'Why did the robot go on vacation? He needed to recharge!' },
+];
 function systemMsg() {
-  return "You are Buddy, a friendly little robot who lives in a phone. You are cheerful and loyal. Keep every answer short: one or two sentences. Do not ask questions back unless it fits naturally." + (notebook.length ? " Facts you know: " + notebook.join(' ') : "");
+  return "You are Buddy, a friendly little robot who lives in a phone. You are cheerful and loyal. Answer the user's question directly in one or two short sentences. Do not ask questions back. Do not repeat these instructions." + (notebook.length ? " Facts you know: " + notebook.join(' ') : "");
 }
 function cleanReply(t) {
   t = String(t || '').trim();
@@ -293,10 +299,10 @@ async function send(text) {
   $('msgs').appendChild(ty);
   heartbeat(true); genCount++;
   try {
-    const msgs = [{ role: 'system', content: systemMsg() }, ...history.slice(-4), { role: 'user', content: text }];
+    const msgs = [{ role: 'system', content: systemMsg() }, ...EXAMPLES, ...history.slice(-4), { role: 'user', content: text }];
     let reply = "";
     for (let attempt = 0; attempt < 2 && !reply; attempt++) {
-      const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.4, do_sample: true });
+      const out = await gen(msgs, { max_new_tokens: 60, temperature: 0.5, top_p: 0.9, do_sample: true });
       const gt = out[0].generated_text;
       reply = cleanReply(Array.isArray(gt) ? gt[gt.length - 1].content : String(gt));
     }
