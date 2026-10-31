@@ -84,8 +84,9 @@
   <div class="card" id="brainCard">
     <div id="crashNote" style="display:none;background:#3a2c10;border:1px solid #e5a54d;border-radius:12px;padding:12px;margin-bottom:10px;font-size:13px;color:#ffd9a0"></div>
     <h2 id="brainTitle">Buddy's brain isn't loaded yet</h2>
-    <p>Tap the button and this page downloads Buddy's AI brain — one that was actually trained to answer questions — then runs it <b>on your phone, inside this page</b>. No App Store, no account, no cost. About 363&nbsp;MB, one-time download — Wi-Fi is best. After that first download, Buddy thinks right here, even with the internet off.</p>
+    <p>Tap the button and this page downloads Buddy's AI brain — one that was actually trained to answer questions — then runs it <b>on your phone, inside this page</b>. No App Store, no account, no cost. About 273–363&nbsp;MB, one-time download — Wi-Fi is best. After that first download, Buddy thinks right here, even with the internet off.</p>
     <button id="wakeBtn">Wake up Buddy</button>
+    <div id="bigAgain" style="display:none;font-size:13px;color:#93a3bb;margin-top:10px;text-align:center">Last time Buddy had to use his smaller brain. <button id="bigAgainBtn" style="background:none;border:none;color:#3ecfbf;font-size:13px;text-decoration:underline;padding:0">Try the bigger brain first</button></div>
     <div id="phase"></div>
     <div id="bar"><div id="barFill"></div></div>
     <div id="errBox"></div>
@@ -121,6 +122,7 @@
 const $ = id => document.getElementById(id);
 const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js';
 const BIG = { id: 'onnx-community/SmolLM2-360M-Instruct-ONNX', dtype: 'q8', label: 'big brain', size: '~363 MB' };
+const MID = { id: 'onnx-community/SmolLM2-360M-Instruct-ONNX', dtype: 'q4f16', label: 'lighter big brain', size: '~273 MB' };
 const SMALL = { id: 'onnx-community/SmolLM2-135M-Instruct-ONNX', dtype: 'q8', label: 'smaller brain', size: '~136 MB' };
 let gen = null, live = false, history = [], voiceOn = true, genCount = 0;
 
@@ -147,7 +149,7 @@ window.addEventListener('pagehide', () => { try { if (live) ls('buddy_clean', '1
     if (hb && !clean && !err && Date.now() - Number(hb) < 120000) {
       const n = $('crashNote');
       n.style.display = 'block';
-      n.textContent = "Buddy's page shut down suddenly while he was thinking. He's back on his smaller brain now to stay safe.";
+      n.textContent = "Buddy's page shut down suddenly while he was thinking. He'll try his lighter big brain first next time to stay safe.";
       ls('buddy_brain_choice', 'small');
     }
     localStorage.removeItem('buddy_hb'); localStorage.removeItem('buddy_clean');
@@ -178,6 +180,8 @@ function teach(text) {
   const fact = text.replace(/^remember:?\s*/i, '').trim();
   if (!fact) return null;
   const f = fact.endsWith('.') ? fact : fact + '.';
+  const norm = s => s.toLowerCase().replace(/[.]+$/, '').trim();
+  if (notebook.some(n => norm(n) === norm(f))) return f;
   notebook.push(f); saveNb(); renderNb();
   return f;
 }
@@ -245,22 +249,24 @@ async function loadBrain(which) {
   if (!txt) throw new Error('EmptyTestReply');
   return g;
 }
+if (ls('buddy_brain_choice') === 'small') $('bigAgain').style.display = 'block';
+$('bigAgainBtn').onclick = () => { try { localStorage.removeItem('buddy_brain_choice'); } catch(e) {} $('wakeBtn').click(); };
 $('wakeBtn').onclick = async () => {
   $('wakeBtn').disabled = true; $('errBox').style.display = 'none';
   try { localStorage.removeItem('buddy_last_error'); } catch(e) {}
   setPill('Waking'); heartbeat(true);
-  const order = (ls('buddy_brain_choice') === 'small') ? [SMALL, BIG] : [BIG, SMALL];
+  const order = (ls('buddy_brain_choice') === 'small') ? [MID, SMALL] : [BIG, MID, SMALL];
   for (const which of order) {
     try {
       setPhase('Loading ' + which.label + ' (' + which.size + ')...');
       gen = await loadBrain(which);
-      heartbeat(false);
-      try { ls('buddy_brain_choice', which === BIG ? 'big' : 'small'); } catch(e) {}
-      if (which === SMALL && order[0] === BIG) addSysNote("The bigger brain couldn't fit on this phone, so Buddy switched to his smaller brain — still trained to answer, just humbler.");
+      try { ls('buddy_brain_choice', which === SMALL ? 'small' : 'big'); } catch(e) {}
+      if (which === MID && order[0] === BIG) addSysNote("The biggest brain couldn't fit on this phone, so Buddy switched to his lighter big brain — same brain, lighter weights.");
+      if (which === SMALL && order[0] !== SMALL) addSysNote("The bigger brain couldn't fit on this phone, so Buddy switched to his smaller brain — still trained to answer, just humbler.");
       return ready();
     } catch (e) {
       showError('while loading the ' + which.label, e);
-      setPhase('The ' + which.label + ' failed — trying the other brain...');
+      setPhase('The ' + which.label + ' failed — trying the next brain...');
     }
   }
   heartbeat(false);
@@ -291,7 +297,7 @@ async function send(text) {
   $('in').value = '';
   if (/^remember\b/i.test(text)) {
     const f = teach(text);
-    const c = f ? "Got it — written in my notebook: " + f : "Tell me what to remember!";
+    const c = f ? "Got it — that's in my notebook: " + f : "Tell me what to remember!";
     addMsg('buddy', c); speak(c);
     return;
   }
@@ -311,8 +317,6 @@ async function send(text) {
     ty.remove(); addMsg('buddy', reply); speak(reply);
   } catch (e) {
     ty.remove(); addMsg('buddy', "Ouch — something broke while I was thinking. Try again?");
-  } finally {
-    if (genCount >= 3) heartbeat(false);
   }
 }
 $('send').onclick = () => send($('in').value);
