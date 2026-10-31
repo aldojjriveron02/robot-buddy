@@ -115,7 +115,7 @@
     </div>
   </div>
 
-  <div class="fine">Buddy thinks on your phone — nothing you type leaves this page, and his notebook stays on this phone.</div>
+  <div class="fine">Buddy thinks on your phone — nothing you type leaves this page, and his notebook stays on this phone. He's a tiny brain, so he sometimes gets facts wrong — his notebook is what he truly remembers.</div>
 </div>
 
 <script>
@@ -255,7 +255,10 @@ $('wakeBtn').onclick = async () => {
   $('wakeBtn').disabled = true; $('errBox').style.display = 'none';
   try { localStorage.removeItem('buddy_last_error'); } catch(e) {}
   setPill('Waking'); heartbeat(true);
-  const order = (ls('buddy_brain_choice') === 'small') ? [MID, SMALL] : [BIG, MID, SMALL];
+  const hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
+  const order = (ls('buddy_brain_choice') === 'small')
+    ? (hasWebGPU ? [MID, SMALL] : [SMALL, BIG])
+    : (hasWebGPU ? [BIG, MID, SMALL] : [BIG, SMALL]);
   for (const which of order) {
     try {
       setPhase('Loading ' + which.label + ' (' + which.size + ')...');
