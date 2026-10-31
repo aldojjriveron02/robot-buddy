@@ -149,7 +149,10 @@ window.addEventListener('pagehide', () => { try { if (live) ls('buddy_clean', '1
     if (hb && !clean && !err && Date.now() - Number(hb) < 120000) {
       const n = $('crashNote');
       n.style.display = 'block';
-      n.textContent = "Buddy's page shut down suddenly while he was thinking. He'll try his lighter big brain first next time to stay safe.";
+      const gpu = typeof navigator !== 'undefined' && !!navigator.gpu;
+      n.textContent = gpu
+        ? "Buddy's page shut down suddenly while he was thinking. He'll try his lighter big brain first next time to stay safe."
+        : "Buddy's page shut down suddenly while he was thinking. He'll try his smaller brain first next time to stay safe.";
       ls('buddy_brain_choice', 'small');
     }
     localStorage.removeItem('buddy_hb'); localStorage.removeItem('buddy_clean');
@@ -158,9 +161,16 @@ window.addEventListener('pagehide', () => { try { if (live) ls('buddy_clean', '1
 
 // notebook
 const SEEDS = ["My human's name is Aldo.", "Aldo lives in Miami.", "Aldo builds robot games."];
+const norm = s => s.toLowerCase().replace(/[.]+$/, '').trim();
 let notebook;
 try { notebook = JSON.parse(localStorage.getItem('buddy_notebook_v1') || 'null') || SEEDS.slice(); }
 catch(e) { notebook = SEEDS.slice(); }
+// clean any duplicates saved before dedupe existed
+{
+  const seen = new Set(), cleaned = [];
+  notebook.forEach(f => { const k = norm(f); if (!seen.has(k)) { seen.add(k); cleaned.push(f); } });
+  if (cleaned.length !== notebook.length) { notebook = cleaned; try { localStorage.setItem('buddy_notebook_v1', JSON.stringify(notebook)); } catch(e) {} }
+}
 function saveNb() { try { localStorage.setItem('buddy_notebook_v1', JSON.stringify(notebook)); } catch(e) {} }
 function renderNb() {
   $('nbCount').textContent = notebook.length + ' facts';
@@ -175,12 +185,11 @@ function renderNb() {
 }
 $('nbHead').onclick = () => { $('nbBody').classList.toggle('open'); $('nbTog').textContent = $('nbBody').classList.contains('open') ? '▼' : '▶'; };
 $('teachBtn').onclick = () => { const v = $('teachIn').value.trim(); if (!v) return; teach(v); $('teachIn').value = ''; };
-$('forgetAll').onclick = () => { notebook = []; saveNb(); renderNb(); };
+$('forgetAll').onclick = () => { if (!confirm('Forget everything Buddy knows? This cannot be undone.')) return; notebook = []; saveNb(); renderNb(); };
 function teach(text) {
   const fact = text.replace(/^remember:?\s*/i, '').trim();
   if (!fact) return null;
   const f = fact.endsWith('.') ? fact : fact + '.';
-  const norm = s => s.toLowerCase().replace(/[.]+$/, '').trim();
   if (notebook.some(n => norm(n) === norm(f))) return f;
   notebook.push(f); saveNb(); renderNb();
   return f;
