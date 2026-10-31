@@ -13,7 +13,7 @@
   body { margin: 0; background: #0b1220; color: #e8eef7; font-family: -apple-system, system-ui, sans-serif;
          padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
   .wrap { max-width: 520px; margin: 0 auto; padding: 12px 14px 24px; }
-  header { display: flex; align-items: center; gap: 12px; padding: 8px 0 14px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 0 14px; }
   .bot { width: 56px; height: 56px; border-radius: 14px; background: #16233a; position: relative; flex: none;
          border: 1px solid #24344f; }
   .bot .ant { position: absolute; top: -9px; left: 50%; width: 3px; height: 10px; background: #3ecfbf; transform: translateX(-50%); }
@@ -48,6 +48,7 @@
   .msg.me { background: #f97316; color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
   .msg .spk { position: absolute; right: -38px; top: 6px; font-size: 18px; background: #1a2942; border: 1px solid #24344f;
               border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  @media (max-width: 360px) { .msg { max-width: 82%; } }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   .chip { font-size: 13px; padding: 8px 12px; border-radius: 20px; border: 1px solid #3ecfbf; background: transparent; color: #3ecfbf; }
   .composer { display: flex; gap: 8px; margin-top: 6px; }
@@ -124,15 +125,18 @@ const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/t
 const BIG = { id: 'onnx-community/SmolLM2-360M-Instruct-ONNX', dtype: 'q8', label: 'big brain', size: '~363 MB' };
 const MID = { id: 'onnx-community/SmolLM2-360M-Instruct-ONNX', dtype: 'q4f16', label: 'lighter big brain', size: '~273 MB' };
 const SMALL = { id: 'onnx-community/SmolLM2-135M-Instruct-ONNX', dtype: 'q8', label: 'smaller brain', size: '~136 MB' };
-let gen = null, live = false, history = [], voiceOn = true, genCount = 0;
+let gen = null, live = false, history = [], voiceOn = true, genCount = 0, busy = false;
 
 function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e) {} return null; }
 function setPhase(t) { $('phase').textContent = t; }
 function setPill(t, on) { const p = $('statusPill'); p.textContent = t; p.classList.toggle('live', !!on); }
+let errLog = [];
 function showError(phase, err) {
   const box = $('errBox');
   box.style.display = 'block';
-  box.innerHTML = '<b>Something broke ' + phase + '.</b><code>' + String((err && err.name ? err.name + ': ' : '') + (err && err.message ? err.message : err)).slice(0, 600) + '</code><div style="margin-top:8px;color:#ffb3b3">If you show this box to El Loko, he can see exactly what failed.</div>';
+  const msg = String((err && err.name ? err.name + ': ' : '') + (err && err.message ? err.message : err)).slice(0, 600);
+  errLog.push(phase + ' :: ' + msg);
+  box.innerHTML = '<b>Something broke.</b>' + errLog.map(e => '<code>' + e + '</code>').join('') + '<div style="margin-top:8px;color:#ffb3b3">If you show this box to El Loko, he can see exactly what failed.</div>';
   try { ls('buddy_last_error', phase + ' :: ' + String(err && err.message || err).slice(0, 300)); } catch(e) {}
 }
 function heartbeat(on) {
@@ -146,7 +150,7 @@ window.addEventListener('pagehide', () => { try { if (live) ls('buddy_clean', '1
 (function () {
   try {
     const hb = localStorage.getItem('buddy_hb'), clean = localStorage.getItem('buddy_clean'), err = localStorage.getItem('buddy_last_error');
-    if (hb && !clean && !err && Date.now() - Number(hb) < 120000) {
+    if (hb && !clean && !err) {
       const n = $('crashNote');
       n.style.display = 'block';
       const gpu = typeof navigator !== 'undefined' && !!navigator.gpu;
@@ -165,6 +169,8 @@ const norm = s => s.toLowerCase().replace(/[.]+$/, '').trim();
 let notebook;
 try { notebook = JSON.parse(localStorage.getItem('buddy_notebook_v1') || 'null') || SEEDS.slice(); }
 catch(e) { notebook = SEEDS.slice(); }
+if (!Array.isArray(notebook)) notebook = SEEDS.slice();
+notebook = notebook.filter(f => typeof f === 'string');
 // clean any duplicates saved before dedupe existed
 {
   const seen = new Set(), cleaned = [];
@@ -244,11 +250,16 @@ async function loadBrain(which) {
   const { pipeline, env } = await import(LIB);
   env.allowLocalModels = false;
   $('bar').style.display = 'block';
+  let maxPct = 0;
   const g = await pipeline('text-generation', which.id, { dtype: which.dtype,
     progress_callback: p => {
-      if (p.status === 'progress' && p.file && p.total) {
-        $('barFill').style.width = Math.round(p.loaded / p.total * 100) + '%';
-        setPhase('Downloading ' + which.label + ' (' + which.size + ')... ' + Math.round(p.loaded / p.total * 100) + '%');
+      if (p.status === 'progress' && p.file && p.total > 10000000) {
+        const pct = Math.round(p.loaded / p.total * 100);
+        if (pct > maxPct) {
+          maxPct = pct;
+          $('barFill').style.width = pct + '%';
+          setPhase('Downloading ' + which.label + ' (' + which.size + ')... ' + pct + '%');
+        }
       }
     }});
   setPhase('Starting up ' + which.label + '...');
@@ -261,7 +272,7 @@ async function loadBrain(which) {
 if (ls('buddy_brain_choice') === 'small') $('bigAgain').style.display = 'block';
 $('bigAgainBtn').onclick = () => { try { localStorage.removeItem('buddy_brain_choice'); } catch(e) {} $('wakeBtn').click(); };
 $('wakeBtn').onclick = async () => {
-  $('wakeBtn').disabled = true; $('errBox').style.display = 'none';
+  $('wakeBtn').disabled = true; $('errBox').style.display = 'none'; errLog = [];
   try { localStorage.removeItem('buddy_last_error'); } catch(e) {}
   setPill('Waking'); heartbeat(true);
   const hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
@@ -273,8 +284,8 @@ $('wakeBtn').onclick = async () => {
       setPhase('Loading ' + which.label + ' (' + which.size + ')...');
       gen = await loadBrain(which);
       try { ls('buddy_brain_choice', which === SMALL ? 'small' : 'big'); } catch(e) {}
-      if (which === MID && order[0] === BIG) addSysNote("The biggest brain couldn't fit on this phone, so Buddy switched to his lighter big brain — same brain, lighter weights.");
-      if (which === SMALL && order[0] !== SMALL) addSysNote("The bigger brain couldn't fit on this phone, so Buddy switched to his smaller brain — still trained to answer, just humbler.");
+      if (which === MID && order[0] === BIG) addSysNote("The biggest brain didn't load, so Buddy switched to his lighter big brain — same brain, lighter weights.");
+      if (which === SMALL && order[0] !== SMALL) addSysNote("The bigger brains didn't load, so Buddy switched to his smaller brain — still trained to answer, just humbler.");
       return ready();
     } catch (e) {
       showError('while loading the ' + which.label, e);
@@ -283,7 +294,7 @@ $('wakeBtn').onclick = async () => {
   }
   heartbeat(false);
   setPill('Asleep'); $('wakeBtn').disabled = false; $('wakeBtn').textContent = 'Try again';
-  setPhase('Both brains failed. The red box above has the real reasons.');
+  setPhase('All brains failed. The red box above has the real reasons.');
 };
 function addSysNote(t) {
   const d = document.createElement('div');
@@ -292,6 +303,7 @@ function addSysNote(t) {
 }
 function ready() {
   live = true;
+  try { localStorage.removeItem('buddy_last_error'); } catch(e) {}
   setPill('Brain live', true); setPhase('');
   $('brainCard').style.display = 'none';
   $('chat').style.display = 'block';
@@ -300,11 +312,11 @@ function ready() {
   addMsg('buddy', g); speak(g);
   $('chips').style.display = 'flex';
   $('send').disabled = false;
-  $('in').focus();
+  if (window.innerWidth > 520) $('in').focus();
 }
 async function send(text) {
   text = (text || '').trim();
-  if (!text || !live || !gen) return;
+  if (!text || !live || !gen || busy) return;
   addMsg('me', text);
   $('in').value = '';
   if (/^remember\b/i.test(text)) {
@@ -315,6 +327,7 @@ async function send(text) {
   }
   const ty = document.createElement('div'); ty.className = 'typing'; ty.textContent = 'Buddy is thinking...';
   $('msgs').appendChild(ty);
+  busy = true; $('send').disabled = true;
   heartbeat(true); genCount++;
   try {
     const msgs = [{ role: 'system', content: systemMsg() }, ...EXAMPLES, ...history.slice(-4), { role: 'user', content: text }];
@@ -329,6 +342,8 @@ async function send(text) {
     ty.remove(); addMsg('buddy', reply); speak(reply);
   } catch (e) {
     ty.remove(); addMsg('buddy', "Ouch — something broke while I was thinking. Try again?");
+  } finally {
+    busy = false; $('send').disabled = false;
   }
 }
 $('send').onclick = () => send($('in').value);
